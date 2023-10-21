@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<link rel="stylesheet" href="./src/style.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Caveat&family=Lobster&family=Montserrat:wght@300;400;500&family=Poppins:wght@600&display=swap"
+		rel="stylesheet">
+	<title>Document</title>
+</head>
+
+<body>
+	<div class="container">
+		<div class="loginScreen">
+			<input type="text" class="login" placeholder="Введите логин">
+			<button class="button">Войти</button>
+		</div>
+	</div>
+	<script src='request.js'></script>
+	<scriptsrc=''> </scriptsrc=>
+
+
+	<script>
+		const button = document.querySelector(".button");
+		const login = document.querySelector(".login");
+		const container = document.querySelector(".container");
+		button.addEventListener("click", function () { window.application.blocks.loginCheck() });
+
+		window.application = {
+			blocks: {
+				loginCheck: function () {
+					const backURL = 'https://skypro-rock-scissors-paper.herokuapp.com/login?';
+					const login = document.querySelector(".login");
+					console.log(login.value);
+					window.application.login = login.value;
+					let log = new URLSearchParams(
+						{ login: window.application.login })
+					log = log.toString()
+					console.log(`${backURL}${log}`)
+					request({
+						method: "GET",
+						url: `${backURL}${log}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.log(data);
+							window.application.playerToken = data.token;
+							this.playerStatusCheck(window.application.playerToken);
+						},
+						onError: () => {
+							console.log("loginCheck is not working")
+						}
+					})
+				},
+				playerStatusCheck: function (playerToken) {
+					const playerStatusCheckURL = 'https://skypro-rock-scissors-paper.herokuapp.com/player-status?';
+					const tokenURL = new URLSearchParams({
+						token: window.application.playerToken
+					});
+					const playerTokenString = tokenURL.toString();
+					request({
+						method: "GET",
+						url: `${playerStatusCheckURL}${playerTokenString}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.log(data)
+							if (data.status === "error") { window.application.screens.errorScreen() }
+
+							if (data["player-status"].status === "game") {
+								console.log(data);
+								window.application.gameId = data["player-status"].game.id;
+								console.log(window.application.gameId);
+								this.waitingForThePlay();
+							}
+							if (data["player-status"].status === "lobby") {
+								console.log(data);
+								window.application.blocks.lobbyCheck();
+								window.application.screens.lobbyScreen();
+							}
+						},
+						onError: () => {
+							console.log("playerStatusCheck is not working")
+						}
+					})
+				},
+				lobbyCheck: function () {
+					const playerListURL = "https://skypro-rock-scissors-paper.herokuapp.com/player-list?";
+					const tokenURL = new URLSearchParams({
+						token: window.application.playerToken
+					});
+					const playerTokenString = tokenURL.toString();
+					request({
+						method: "GET",
+						url: `${playerListURL}${playerTokenString}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.log(data.list.length);
+							console.log(data);
+							window.application.screens.elementsRemoval();
+							const container = document.createElement("div");
+							container.classList.add("container")
+							document.body.appendChild(container)
+							for (let i = 0; i < data.list.length; i++) {
+								container.appendChild(window.application.screens.templateEngine(window.application.screens.lobbyDisplay(data.list[i])))
+							}
+							container.appendChild(window.application.screens.templateEngine(window.application.screens.playButtonDisplay));
+							const playButton = document.querySelector(".playButton")
+							playButton.addEventListener("click", function () { window.application.screens.timersRemoval() })
+							playButton.addEventListener("click", function () { window.application.blocks.startPlay() })
+						},
+						onError: () => {
+							console.log("lobbyCheck is not working")
+						}
+					})
+				},
+				startPlay: function () {
+					const startPlayURL = "https://skypro-rock-scissors-paper.herokuapp.com/start?";
+					const tokenURL = new URLSearchParams({
+						token: window.application.playerToken
+					});
+					const playerTokenString = tokenURL.toString();
+					request({
+						method: "GET",
+						url: `${startPlayURL}${playerTokenString}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.dir(data);
+							if (data.status === "error") {
+								window.application.screens.errorScreen();
+							} else {
+								console.log(data);
+								console.dir(data);
+								window.application.gameId = data["player-status"].game.id;
+								console.log(window.application.gameId);
+								window.application.screens.waitingForTheGame();
+								let waitingForTheGameStartTimer = setInterval(window.application.blocks.waitingForThePlay(), 1000);
+								window.application.screens.timers.push(waitingForTheGameStartTimer);
+							}
+						},
+						onError: () => {
+							console.log("startplay is not working")
+						}
+					})
+				},
+				waitingForThePlay: function () {
+					const tokenURL = new URLSearchParams({
+						token: window.application.playerToken
+					});
+					const gameIdURL = new URLSearchParams({
+						id: window.application.gameId
+					})
+					const gameIDURLtoString = gameIdURL.toString();
+					const playerTokenString = tokenURL.toString();
+					const waitingForThePlayURL = "https://skypro-rock-scissors-paper.herokuapp.com/game-status?";
+					request({
+						method: "GET",
+						url: `${waitingForThePlayURL}${playerTokenString}&${gameIDURLtoString}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.dir(data);
+							console.log(data);
+							if (data.status === "error") {
+								window.application.screens.errorScreen();
+							}
+							if (data["game-status"].status === "waiting-for-your-move") {
+								console.log(data["game-status"].status);
+								window.application.screens.move();
+							}
+							if (data["game-status"].status === "lose") {
+								console.log(data["game-status"].status);
+								window.application.screens.loseScreen();
+							}
+							if (data["game-status"].status === "win") {
+								console.log(data["game-status"].status);
+								window.application.screens.winScreen();
+							}
+							if (data["game-status"].status === "waiting-for-enemy-move") {
+								console.log(data["game-status"].status);
+								window.application.screens.waitingScreen();
+							}
+							if (data["game-status"].status === "waiting-for-start") {
+								console.log(data["game-status"].status);
+								window.application.screens.waitingForTheGame();
+								let waitingForTheGameStartTimer = setInterval(window.application.blocks.waitingForThePlay(), 1000);
+								window.application.screens.timers.push(waitingForTheGameStartTimer);
+							}
+						},
+						onError: () => {
+							console.log("waitingForThePlay not working")
+						}
+					})
+				},
+				play: function () {
+					const move = new URLSearchParams({
+						move: window.application.move
+					})
+					const tokenURL = new URLSearchParams({
+						token: window.application.playerToken
+					});
+					const gameIdURL = new URLSearchParams({
+						id: window.application.gameId
+					})
+					const gameIDURLtoString = gameIdURL.toString();
+					const playerTokenString = tokenURL.toString();
+					const moveToString = move.toString();
+					const playURL = "https://skypro-rock-scissors-paper.herokuapp.com/play?";
+					request({
+						method: "GET",
+						url: `${playURL}${playerTokenString}&${gameIDURLtoString}&${moveToString}`,
+						requestType: 'urlencoded',
+						onSuccess: (data) => {
+							console.log(data["game-status"].status);
+							if (data["game-status"].status = "win") {
+
+								window.application.screens.winScreen();
+							}
+							if (data["game-status"].status = "lose") {
+								window.application.screens.loseScreen();
+							}
+							if (data["game-status"].status = "waiting-for-your-move") {
+								window.application.screens.move();
+							}
+							if (data["game-status"].status = "waiting-for-enemy-move") {
+								window.application.screens.waitingScreen();
+							}
+						},
+						onError: () => {
+							console.log("play not working")
+						}
+					})
+				}
+			},
+			screens: {
+				templateEngine: function (block) {
+
+					if ((block === undefined) || (block === null) || (block === false)) {
+						return document.createTextNode('');
+					}
+					if ((typeof block === 'string') || (typeof block === 'number') || (block === true)) {
+						return document.createTextNode(block);
+					}
+					if (Array.isArray(block)) {
+						const fragment = document.createDocumentFragment();
+						block.forEach(item => {
+							const el = this.templateEngine(item);
+							fragment.appendChild(el);
+						})
+						return fragment;
+					}
+
+					const element = document.createElement(block.tag);
+					element.classList.add(
+						...[].concat(block.cls).filter(Boolean)
+					);
+
+					if (block.cls) {
+						element.classList.add(
+							...[].concat(block.cls).filter(Boolean)
+						);
+					}
+
+					if (block.attrs) {
+						const keys = Object.keys(block.attrs);
+						keys.forEach(key => { // href
+							element.setAttribute(key, block.attrs[key]);
+						});
+					}
+
+					const content = this.templateEngine(block.content);
+					element.appendChild(content);
+					return element;
+				},
+				elementsRemoval: function () {
+					const container = document.querySelector(".container");
+					container.remove();
+
+				},
+				timersRemoval: function () {
+					if (this.timers.length !== 0) {
+						this.timers.map(element => clearInterval(element));
+						this.timers.splice(1, -1);
+					}
+				},
+				loginDisplay:
+				{
+					tag: 'div',
+					cls: 'container',
+					content: [{
+						tag: 'input',
+						cls: 'login',
+						attrs: {
+							placeholder: "Введите логин",
+						},
+					},
+					{
+						tag: 'button',
+						cls: 'button',
+						content: "Войти"
+
+					}
+					]
+				},
+				loginScreen: function () {
+					this.elementsRemoval();
+					document.body.appendChild(this.templateEngine(this.loginDisplay));
+					const button = document.querySelector(".button");
+					button.addEventListener("click", function () { window.application.blocks.loginCheck() });
+				},
+				lobbyScreen: function (data) {
+					let timer = setInterval(window.application.blocks.lobbyCheck, 5000);
+					window.application.screens.timers.push(timer);
+				},
+				lobbyDisplay: function (data) {
+					return {
+						tag: "div",
+						cls: "playerInLobby",
+						content: data.login,
+					}
+				},
+				playButtonDisplay: {
+					tag: "button",
+					cls: "playButton",
+					content: "Играть",
+				},
+				waitingForTheGame: function () {
+					this.elementsRemoval();
+					document.body.append(this.templateEngine(this.waitingForTheGameDisplay))
+				},
+				waitingForTheGameDisplay: {
+					tag: 'div',
+					cls: 'container',
+					content: [
+						[
+							{
+								tag: 'div',
+								cls: 'title',
+								content: 'Ожидание игры'
+							}
+						]
+					],
+				},
+				move: function (data) {
+					this.elementsRemoval();
+					document.body.append(this.templateEngine(this.moveDisplay));
+					const container = document.querySelector(".container")
+					container.addEventListener("click", function (event) {
+						console.log(event.target.parentElement.className);
+						window.application.move = event.target.parentElement.className;
+						window.application.blocks.play();
+					})
+
+				},
+				moveDisplay:
+				{
+					tag: 'div',
+					cls: 'container',
+					content: [
+						[
+							{
+								tag: 'div',
+								cls: "title",
+								content: "Ваш ход"
+							},
+							{
+								tag: 'div',
+								cls: "scissors",
+								content:
+								{
+									tag: 'img',
+									cls: "item__picture",
+									attrs: {
+										src: "./src/scissors.png"
+									}
+								}
+							},
+							{
+								tag: 'div',
+								cls: "rock",
+								content:
+								{
+									tag: 'img',
+									cls: "item__picture",
+									attrs: {
+										src: "./src/rock.png"
+									}
+								}
+							},
+							{
+								tag: 'div',
+								cls: "paper",
+								content:
+								{
+									tag: 'img',
+									cls: "item__picture",
+									attrs: {
+										src: "./src/paper.png"
+									}
+								}
+							}
+						],
+					]
+				},
+				timers: [
+				],
+				loseScreenDisplay: {
+					tag: 'div',
+					cls: 'container',
+					content: {
+						tag: 'div',
+						cls: 'loseNotification',
+						content: 'Вы проиграли',
+					}
+				},
+				loseScreen: function () {
+					this.elementsRemoval();
+					this.timersRemoval();
+					document.body.append(this.templateEngine(this.loseScreenDisplay));
+				},
+				winScreenDisplay: {
+					tag: 'div',
+					cls: 'container',
+					content: {
+						tag: 'div',
+						cls: 'winNotification',
+						content: 'Вы выиграли',
+					}
+				},
+				winScreen: function () {
+					this.elementsRemoval();
+					this.timersRemoval();
+					document.body.append(this.templateEngine(this.winScreenDisplay));
+				},
+				errorScreenDisplay: {
+					tag: 'div',
+					cls: 'container',
+					content: [{
+						tag: 'div',
+						cls: 'notification',
+						content: 'Ошибка, попробуйте начать игру заново',
+					},
+					{
+						tag: 'button',
+						cls: 'backButton',
+						content: 'Вернуться в начало',
+					}]
+				},
+				errorScreen: function () {
+					this.timersRemoval();
+					this.elementsRemoval();
+					document.body.appendChild(this.templateEngine(this.errorScreenDisplay));
+					const backButton = document.querySelector(".backButton");
+					backButton.addEventListener("click", function () { window.application.screens.loginScreen() })
+				},
+				waitingScreen: function () {
+					this.timersRemoval();
+					this.elementsRemoval();
+					document.body.append(this.templateEngine(this.waitingScreenDisplay));
+					let playTimer = setInterval(window.application.blocks.waitingForThePlay, 1000);
+					window.application.screens.timers.push(playTimer);
+				},
+				waitingScreenDisplay: {
+					tag: 'div',
+					cls: 'container',
+					content: {
+						tag: 'div',
+						cls: 'notification',
+						content: 'Ждем ход соперника',
+					}
+				}
+
+			}
+		}
+	</script>
+</body>
+
+</html>
